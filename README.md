@@ -1,4 +1,4 @@
-## Simple Proxy For Pupeteer (chrome extension)
+## Simple Proxy For Pupeteer (chromium extension)
 
 This extension is primarily to be used with Puppeteer to control the proxy setting of a chromium based web browser.
 
