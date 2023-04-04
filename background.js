@@ -1,93 +1,56 @@
-'use strict';
-
 const getStorageData = (key) =>
-  new Promise((resolve, reject) =>
-    chrome.storage.sync.get(key, (result) => (chrome.runtime.lastError ? reject(Error(chrome.runtime.lastError.message)) : resolve(result))),
-  );
+new Promise((resolve, reject) =>
+  chrome.storage.sync.get(key, (result) => (chrome.runtime.lastError ? reject(Error(chrome.runtime.lastError.message)) : resolve(result))),
+);
 
 const setStorageData = (data) =>
-  new Promise((resolve, reject) =>
-    chrome.storage.sync.set(data, () => (chrome.runtime.lastError ? reject(Error(chrome.runtime.lastError.message)) : resolve())),
-  );
+new Promise((resolve, reject) =>
+  chrome.storage.sync.set(data, () => (chrome.runtime.lastError ? reject(Error(chrome.runtime.lastError.message)) : resolve())),
+);
 
-chrome.runtime.onInstalled.addListener(async () => {
-  await setStorageData({
-    options: [
-      {
-        activeProxy: {
-          type: 'http',
-          host: '',
-          port: null,
-        },
-        proxyEnabled: false,
-      },
-    ],
-  });
-});
+chrome.runtime.onInstalled.addListener(() => 
+setStorageData({ options: [{ activeProxy: {
+  type: 'http',
+  host: '',
+  port: null,
+}, proxyEnabled: false,}],}));
 
 window.setOptions = async (options) => {
   await setStorageData({ options: [options] });
 };
 
-(async () => {
-  let data;
-  data = await getStorageData('options');
-  if (data.options) data = data.options[0];
+getStorageData('options').then((data) => {
+  window.extOptions =   Object.assign(({ activeProxy = {
+      type: 'http', host: '', port: null,
+  }}, (data.options && data.options[0]) || data);
+  
   await new Promise((resolve) => setTimeout(resolve, 100));
-
-  if (typeof data.activeProxy !== 'object') {
-    data.activeProxy = {
-      type: 'http',
-      host: '',
-      port: null,
-    };
-  }
-  window.extOptions = data;
-
+  
   window.disableProxy = () => {
     console.log('disable proxy');
-    const config = {
-      mode: 'direct',
-    };
-
-    chrome.proxy.settings.set({ value: config, scope: 'regular' }, function () {});
+    chrome.proxy.settings.set({ value: { mode: 'direct' }, scope: 'regular' }, function () {});
   };
 
-  window.setProxy = (proxy) => {
-    console.log('set proxy');
-
-    if (!proxy) {
-      proxy = window.extOptions.activeProxy;
-    }
-
-    if (!proxy.type || !proxy.host || !proxy.port) {
-      return { error: true, message: 'Invalid Proxy' };
-    }
-
-    const config = {
-      mode: 'fixed_servers',
-      rules: {
+  window.setProxy = (proxy=window.extOptions.activeProxy) => {
+    const value = { mode: 'fixed_servers', rules: {
         singleProxy: {
           scheme: proxy.type,
           host: proxy.host,
           port: parseInt(proxy.port),
-        },
-        bypassList: [],
+        }, bypassList: [],
       },
     };
-
-    console.log(config);
-
-    chrome.proxy.settings.set({ value: config, scope: 'regular' }, function () {});
-
+    if (!proxy.type || !proxy.host || !proxy.port) {
+      return { error: true, message: 'Invalid Proxy' };
+    }
+    console.log('proxy.setting.set', { value });
+    chrome.proxy.settings.set({ value, scope: 'regular' }, function () {});
     chrome.proxy.onProxyError.addListener((_) => {
-      console.log('Proxy error event triigerd by  chrome.proxy.onProxyError');
-      const actPage = chrome.extension.getViews({ type: 'popup' })[0];
-      if (actPage) {
-        actPage.postMessage({ action: 'proxyError' });
-      }
+      console.error('Proxy error event triigerd by  chrome.proxy.onProxyError');
+      chrome.extension.getViews({ type: 'popup' })[0] &&
+      chrome.extension.getViews({ type: 'popup' })[0].postMessage({ action: 'proxyError' });
     });
 
     return { error: false, message: 'Proxy set to ' + proxy };
   };
-})();
+});
